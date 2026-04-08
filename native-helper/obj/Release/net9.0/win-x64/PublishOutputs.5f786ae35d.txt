@@ -1,0 +1,6 @@
+C:\Dev\playgroung\big-brother\native-helper\out\BigBrother.NativeHost.exe
+C:\Dev\playgroung\big-brother\native-helper\out\inspect-tls.js
+C:\Dev\playgroung\big-brother\native-helper\out\BigBrother.NativeHost.dll
+C:\Dev\playgroung\big-brother\native-helper\out\BigBrother.NativeHost.deps.json
+C:\Dev\playgroung\big-brother\native-helper\out\BigBrother.NativeHost.runtimeconfig.json
+C:\Dev\playgroung\big-brother\native-helper\out\BigBrother.NativeHost.pdb

@@ -1,0 +1,9 @@
+{
+    "name":  "com.bigbrother.tlshelper",
+    "description":  "Big Brother TLS inspection native host",
+    "path":  "C:\\Dev\\playgroung\\big-brother\\native-helper\\out\\BigBrother.NativeHost.exe",
+    "type":  "stdio",
+    "allowed_origins":  [
+                            "chrome-extension://ejbjfllfjoclemoaohodbpcefcbjjdjc/"
+                        ]
+}
