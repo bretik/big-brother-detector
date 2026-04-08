@@ -19,5 +19,10 @@
   "options_ui": {
     "page": "common/popup.html",
     "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "big-brother-detector@bretik.dev"
+    }
   }
 }

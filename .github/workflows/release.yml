@@ -25,6 +25,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Validate release tag
         shell: pwsh
         run: |
@@ -32,9 +37,31 @@ jobs:
             throw "RELEASE_TAG is required."
           }
 
+      - name: Validate Firefox signing secrets
+        shell: pwsh
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:AMO_JWT_ISSUER) -or [string]::IsNullOrWhiteSpace($env:AMO_JWT_SECRET)) {
+            throw "AMO_JWT_ISSUER and AMO_JWT_SECRET must be configured to create an installable Firefox release package."
+          }
+
+      - name: Install web-ext
+        shell: pwsh
+        run: npm install --global web-ext
+
       - name: Build and package extensions
         shell: pwsh
-        run: .\package.ps1 -OutputRoot artifacts -ReleaseLabel $env:RELEASE_TAG
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: >
+          .\package.ps1
+          -OutputRoot artifacts
+          -ReleaseLabel $env:RELEASE_TAG
+          -AmoJwtIssuer $env:AMO_JWT_ISSUER
+          -AmoJwtSecret $env:AMO_JWT_SECRET
 
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
@@ -50,4 +77,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
-            artifacts\*
+            artifacts\big-brother-detector-chromium-${{ env.RELEASE_TAG }}.zip
+            artifacts\big-brother-detector-firefox-${{ env.RELEASE_TAG }}.xpi
+            artifacts\SHA256SUMS.txt

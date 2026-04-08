@@ -43,6 +43,9 @@ Run this from the project root:
 To build release artifacts:
 
 ```powershell
+npm install --global web-ext
+$env:AMO_JWT_ISSUER = "<issuer>"
+$env:AMO_JWT_SECRET = "<secret>"
 .\package.ps1
 ```
 
@@ -65,16 +68,36 @@ The repository includes a GitHub Actions workflow at
   tag
 - each release uploads:
   - a Chromium package zip
-  - a Firefox package xpi
+  - a signed Firefox package xpi
   - a SHA-256 checksum file
+- the workflow requires GitHub repository secrets:
+  - `AMO_JWT_ISSUER`
+  - `AMO_JWT_SECRET`
 
 ### Browser installation note
 
-Firefox can install an `.xpi` package directly when it is signed for normal
-distribution. Chromium-based browsers generally do **not** allow direct
-installation from a GitHub release asset without store or policy-based
-distribution, so the release zip is best suited for browser store submission or
-developer loading.
+Stable Firefox reports unsigned `.xpi` files as corrupt, so `package.ps1` and
+the GitHub release workflow now build **only** a signed Firefox package through
+AMO.
+
+If `package.ps1` fails with a Node.js TLS error such as
+`UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, configure Node to trust your local or
+corporate CA certificate before signing:
+
+```powershell
+$env:NODE_EXTRA_CA_CERTS = "C:\path\to\corporate-ca.pem"
+```
+
+If your network requires an HTTP proxy, also set:
+
+```powershell
+$env:HTTPS_PROXY = "http://proxy-host:port"
+$env:HTTP_PROXY = "http://proxy-host:port"
+```
+
+Chromium-based browsers generally do **not** allow direct installation from a
+GitHub release asset without store or policy-based distribution, so the release
+zip is best suited for browser store submission or developer loading.
 
 ## Install in Firefox
 
