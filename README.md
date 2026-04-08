@@ -40,10 +40,41 @@ Run this from the project root:
 .\build.ps1
 ```
 
+To build release artifacts:
+
+```powershell
+.\package.ps1
+```
+
 This creates:
 
 - `dist\chrome`
 - `dist\firefox`
+- `artifacts\big-brother-detector-chromium-<tag>.zip`
+- `artifacts\big-brother-detector-firefox-<tag>.xpi`
+- `artifacts\SHA256SUMS.txt`
+
+## GitHub releases
+
+The repository includes a GitHub Actions workflow at
+`.github\workflows\release.yml`.
+
+- pushing a tag like `v0.2.0` builds the extension packages and creates a
+  GitHub release
+- manual runs through `workflow_dispatch` can create a release for a supplied
+  tag
+- each release uploads:
+  - a Chromium package zip
+  - a Firefox package xpi
+  - a SHA-256 checksum file
+
+### Browser installation note
+
+Firefox can install an `.xpi` package directly when it is signed for normal
+distribution. Chromium-based browsers generally do **not** allow direct
+installation from a GitHub release asset without store or policy-based
+distribution, so the release zip is best suited for browser store submission or
+developer loading.
 
 ## Install in Firefox
 

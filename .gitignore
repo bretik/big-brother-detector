@@ -1,4 +1,5 @@
 dist/
+artifacts/
 native-helper/bin/
 native-helper/obj/
 native-helper/out/
