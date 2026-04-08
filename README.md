@@ -59,7 +59,7 @@ This creates:
 The repository includes a GitHub Actions workflow at
 `.github\workflows\release.yml`.
 
-- pushing a tag like `v0.2.0` builds the extension packages and creates a
+- pushing a tag like `v0.0.1` builds the extension packages and creates a
   GitHub release
 - manual runs through `workflow_dispatch` can create a release for a supplied
   tag
