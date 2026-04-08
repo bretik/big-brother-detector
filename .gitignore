@@ -1,4 +1,4 @@
-dist\
-native-helper\bin\
-native-helper\obj\
-native-helper\out\
+dist/
+native-helper/bin/
+native-helper/obj/
+native-helper/out/
