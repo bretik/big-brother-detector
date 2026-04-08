@@ -60,8 +60,6 @@ jobs:
           .\package.ps1
           -OutputRoot artifacts
           -ReleaseLabel $env:RELEASE_TAG
-          -AmoJwtIssuer $env:AMO_JWT_ISSUER
-          -AmoJwtSecret $env:AMO_JWT_SECRET
 
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4

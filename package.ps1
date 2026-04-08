@@ -54,12 +54,20 @@ if ($LASTEXITCODE -ne 0) {
 
 New-Item -ItemType Directory -Path $signedFirefoxArtifactsRoot | Out-Null
 
-& $webExt.Source sign `
-  --source-dir (Join-Path $distRoot "firefox") `
-  --artifacts-dir $signedFirefoxArtifactsRoot `
-  --channel unlisted `
-  --api-key $resolvedAmoJwtIssuer `
-  --api-secret $resolvedAmoJwtSecret
+$previousWebExtApiKey = $env:WEB_EXT_API_KEY
+$previousWebExtApiSecret = $env:WEB_EXT_API_SECRET
+$env:WEB_EXT_API_KEY = $resolvedAmoJwtIssuer
+$env:WEB_EXT_API_SECRET = $resolvedAmoJwtSecret
+
+try {
+  & $webExt.Source sign `
+    --source-dir (Join-Path $distRoot "firefox") `
+    --artifacts-dir $signedFirefoxArtifactsRoot `
+    --channel unlisted
+} finally {
+  $env:WEB_EXT_API_KEY = $previousWebExtApiKey
+  $env:WEB_EXT_API_SECRET = $previousWebExtApiSecret
+}
 
 if ($LASTEXITCODE -ne 0) {
   throw "web-ext sign failed. See the error above for the AMO/network/authentication details."
