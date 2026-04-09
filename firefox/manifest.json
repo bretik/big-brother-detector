@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Big Brother Detector",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Detects whether the traffic is intercepted by Zscaler Internet Security.",
   "permissions": [
     "tabs",
@@ -12,9 +12,19 @@
   "background": {
     "page": "background.html"
   },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "browser_action": {
     "default_title": "Big Brother Detector",
-    "default_popup": "common/popup.html"
+    "default_popup": "common/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
   },
   "options_ui": {
     "page": "common/popup.html",
@@ -26,4 +36,5 @@
     }
   }
 }
+
 

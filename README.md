@@ -63,23 +63,44 @@ Optional:
 
 ## Install in Firefox
 
+### Unpacked extension
+
 1. Open Firefox.
 2. Go to `about:debugging`.
 3. Open `This Firefox`.
 4. Click `Load Temporary Add-on`.
-5. Select `C:\Dev\playgroung\big-brother\dist\firefox\manifest.json`.
+5. Select `dist\firefox\manifest.json` from your local clone of this repository.
 
 Firefox will use the built-in detection mode automatically.
 
+### Packed extension
+
+Use the signed `.xpi` package from `artifacts`, for example:
+
+- `artifacts\big-brother-detector-firefox-v0.1.0.xpi`
+
+You can open the `.xpi` file in Firefox, or drag it into a Firefox window to install it.
+
 ## Install in Chrome, Edge, Chromium, or Brave
+
+### Unpacked extension
 
 1. Open the browser extensions page.
    Chrome: `chrome://extensions`
    Edge: `edge://extensions`
    Brave: `brave://extensions`
+   Chromium: `chrome://extensions`
 2. Turn on developer mode.
 3. Click `Load unpacked`.
-4. Select `C:\Dev\playgroung\big-brother\dist\chrome`.
+4. Select `dist\chrome` from your local clone of this repository.
+
+### Packed extension
+
+Use the Chromium zip package from `artifacts`, for example:
+
+- `artifacts\big-brother-detector-chromium-v0.1.0.zip`
+
+Extract the zip to a folder first, then load that extracted folder as an unpacked extension from the browser extensions page.
 
 ## Use `Chrome flag` mode
 
@@ -99,6 +120,19 @@ Then:
 
 If the diagnostics say `Chrome flag mode available: no`, the browser is not
 exposing certificate details to the extension.
+
+## Examples
+
+The popup reports one of two main HTTPS outcomes:
+
+1. `Not intercepted`
+   Direct TLS connection to the site, using the site's original public certificate chain.
+   
+   ![Direct TLS example](images/direct.png)
+2. `Intercepted`
+   HTTPS traffic is being re-signed by Zscaler, and the certificate issuer / subject match the configured Zscaler rules.
+   
+   ![Intercepted traffic example](images/intercepted.png)
 
 ## What is detected
 
