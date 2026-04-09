@@ -21,34 +21,9 @@
         <div class="value" id="status-label">Unknown</div>
       </section>
 
-
       <section class="card muted" id="details-card">
         <div class="label">Certificate hints</div>
         <div class="details" id="details">No certificate details available.</div>
-      </section>
-      <section class="card" id="mode-card">
-        <div class="label">Detection mode</div>
-        <div class="mode-help" id="mode-summary">Loading mode settings...</div>
-        <form id="mode-form">
-          <label class="choice" id="choice-native">
-            <input type="radio" name="mode" value="native_helper" />
-            <span>
-              <strong>Native helper</strong>
-              <small>Recommended for Chrome without special startup flags.</small>
-            </span>
-          </label>
-          <label class="choice" id="choice-flag">
-            <input type="radio" name="mode" value="chrome_flag" />
-            <span>
-              <strong>Chrome flag</strong>
-              <small>Use Chrome's `WebRequestSecurityInfo` developer flag.</small>
-            </span>
-          </label>
-          <div class="actions">
-            <button type="submit" id="save-button">Save mode</button>
-          </div>
-        </form>
-        <div class="note" id="save-status"></div>
       </section>
       <section class="card muted" id="setup-card">
         <div class="label">Setup</div>
@@ -63,4 +38,3 @@
     <script src="./popup.js"></script>
   </body>
 </html>
-

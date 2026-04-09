@@ -234,11 +234,8 @@ browser.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "GET_SETTINGS") {
     return Promise.resolve({
       browserFamily: "firefox",
-      mode: "firefox_builtin",
-      modeOptions: [],
-      setupText: "Firefox has built-in certificate inspection support in the extension API, so no extra mode selection is needed.",
+      setupText: "",
       diagnostics: [
-        "Selected mode: Firefox built-in",
         "Certificate inspection API available: yes"
       ]
     });
@@ -248,11 +245,8 @@ browser.runtime.onMessage.addListener((message, sender) => {
     return Promise.resolve({
       settings: {
         browserFamily: "firefox",
-        mode: "firefox_builtin",
-        modeOptions: [],
-        setupText: "Firefox has built-in certificate inspection support in the extension API, so no extra mode selection is needed.",
+        setupText: "",
         diagnostics: [
-          "Selected mode: Firefox built-in",
           "Certificate inspection API available: yes"
         ]
       },
@@ -266,3 +260,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
 });
 
 refreshActiveTab().catch(() => {});
+
+
+
+
+
+

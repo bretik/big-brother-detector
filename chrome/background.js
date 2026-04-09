@@ -7,18 +7,12 @@ const pendingVisualFlushes = new Set();
 const pendingVisualVersions = new Map();
 const pendingRequestVersions = new Map();
 const TAB_STATE_PREFIX = "tabState:";
-const DEFAULT_SETTINGS = {
-  mode: "native_helper",
-};
-const HOST_NAME = "dev.bretik.tlshelper";
-const MODE_OPTIONS = ["native_helper", "chrome_flag"];
 
 let activeTabId = null;
-let currentMode = DEFAULT_SETTINGS.mode;
 let flagModeAvailable = false;
+let flagModeKnown = false;
 let flagModeError = "";
-let nativeHelperAvailable = null;
-let nativeHelperError = "";
+let headerListenerUsesSecurityInfo = false;
 
 function storageGet(keys) {
   return new Promise((resolve, reject) => {
@@ -100,13 +94,14 @@ function clonePersistedState(state) {
   };
 }
 
-function isPersistableFinalState(state) {
-  return isFinalVisualState(state);
+function isFinalVisualState(state) {
+  const kind = state && state.status ? state.status.kind : "unknown";
+  return kind === "intercepted" || kind === "not_intercepted" || kind === "insecure";
 }
 
 async function persistTabState(tabId, state) {
   const key = tabStateKey(tabId);
-  if (isPersistableFinalState(state)) {
+  if (isFinalVisualState(state)) {
     await storageSet({ [key]: clonePersistedState(state) });
     return;
   }
@@ -132,62 +127,30 @@ async function restorePersistedTabStates() {
   }
 }
 
-function sendNativeMessage(message) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendNativeMessage(HOST_NAME, message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      resolve(response);
-    });
-  });
-}
-
-async function probeNativeHelper() {
-  try {
-    const response = await sendNativeMessage({ type: "ping" });
-    nativeHelperAvailable = !!(response && response.ok === true);
-    nativeHelperError = nativeHelperAvailable ? "" : "Native helper responded unexpectedly.";
-  } catch (error) {
-    nativeHelperAvailable = false;
-    nativeHelperError = error && error.message ? error.message : "Native helper ping failed.";
-  }
+function setFlagModeAvailability(isAvailable, errorMessage) {
+  flagModeKnown = true;
+  flagModeAvailable = !!isAvailable;
+  flagModeError = errorMessage || "";
 }
 
 function getFlagModeReason() {
-  if (flagModeAvailable) {
-    return "Chrome flag mode is active. If this browser was started with WebRequestSecurityInfo enabled, certificate inspection will use Chrome's own TLS metadata.";
+  if (flagModeKnown && flagModeAvailable) {
+    return "Chrome flag mode is active. Certificate inspection uses Chrome's TLS metadata for this page.";
   }
 
-  const detail = flagModeError
-    ? ` Chrome reported: ${flagModeError}`
-    : "";
-  return "Chrome flag mode is selected, but this Chrome build is not exposing TLS certificate details to the extension. Start Chrome with the WebRequestSecurityInfo developer flag enabled, or switch to Native helper mode." + detail;
-}
-
-function getSetupText(mode) {
-  if (mode === "chrome_flag") {
-    return "Chrome flag mode needs Chrome to be started with the WebRequestSecurityInfo developer flag enabled. If your company Chrome build does not allow that, switch to Native helper mode instead.";
+  if (!flagModeKnown) {
+    return "Checking whether Chrome is exposing TLS metadata for this page.";
   }
 
-  return "Native helper mode needs the local helper to be installed once. In PowerShell, run .\\native-helper\\install-helper.ps1 with the matching extension ID switch for this browser, such as -BraveExtensionId <id>, -ChromeExtensionId <id>, -EdgeExtensionId <id>, or -ChromiumExtensionId <id>. After installation, reload the extension and keep this mode selected.";
+  const detail = flagModeError ? ` Chrome reported: ${flagModeError}` : "";
+  return "Chrome flag mode requires Chrome to be started with the WebRequestSecurityInfo developer flag enabled." + detail;
 }
 
 function buildDiagnostics() {
   const diagnostics = [];
-  diagnostics.push(`Selected mode: ${currentMode === "chrome_flag" ? "Chrome flag" : "Native helper"}`);
   diagnostics.push(`Chrome flag mode available: ${flagModeAvailable ? "yes" : "no"}`);
   if (!flagModeAvailable && flagModeError) {
     diagnostics.push(`Flag registration error: ${flagModeError}`);
-  }
-  if (nativeHelperAvailable === null) {
-    diagnostics.push("Native helper reachable: not checked yet");
-  } else {
-    diagnostics.push(`Native helper reachable: ${nativeHelperAvailable ? "yes" : "no"}`);
-  }
-  if (nativeHelperAvailable === false && nativeHelperError) {
-    diagnostics.push(`Native helper error: ${nativeHelperError}`);
   }
   diagnostics.push("For startup flag verification, chrome://version should include --enable-features=WebRequestSecurityInfo in the Command Line field.");
   return diagnostics;
@@ -271,11 +234,6 @@ function scheduleTabVisualUpdate(tabId) {
     .catch(() => {});
 }
 
-function isFinalVisualState(state) {
-  const kind = state && state.status ? state.status.kind : "unknown";
-  return kind === "intercepted" || kind === "not_intercepted" || kind === "insecure";
-}
-
 function setTabState(tabId, state) {
   tabStates.set(tabId, state);
   pendingVisualVersions.set(tabId, (pendingVisualVersions.get(tabId) || 0) + 1);
@@ -304,10 +262,6 @@ function refreshTabVisualState(tabId) {
   }
 }
 
-function createHttpsUnknownState(url, reason) {
-  return BigBrotherStatus.createUnknownState(url, reason);
-}
-
 function createStateForNonHttps(url) {
   if (url.startsWith("http://")) {
     return BigBrotherStatus.buildTabState({
@@ -322,9 +276,21 @@ function createStateForNonHttps(url) {
   return BigBrotherStatus.createUnknownState(url, "This tab is not an HTTP(S) page.");
 }
 
+function normalizeChromeTabState(state) {
+  if (!state) {
+    return state;
+  }
+
+  if (state.status && state.status.kind === "loading" && flagModeKnown && !flagModeAvailable) {
+    return BigBrotherStatus.createUnknownState(state.url || "", getFlagModeReason());
+  }
+
+  return state;
+}
+
 function getCurrentStateForTab(tabId) {
   if (typeof tabId === "number" && tabStates.has(tabId)) {
-    return tabStates.get(tabId);
+    return normalizeChromeTabState(tabStates.get(tabId));
   }
 
   return {
@@ -342,6 +308,10 @@ function getCurrentStateForTab(tabId) {
 
 async function buildStateFromChromeSecurityInfo(url, securityInfo) {
   if (!securityInfo) {
+    if (flagModeKnown && !flagModeAvailable) {
+      return BigBrotherStatus.createUnknownState(url, getFlagModeReason());
+    }
+
     return BigBrotherStatus.createLoadingState(url, getFlagModeReason());
   }
 
@@ -359,7 +329,7 @@ function shouldPreserveExistingHttpsState(tabId, url, securityInfo) {
     return false;
   }
 
-  const existingState = getCurrentStateForTab(tabId);
+  const existingState = normalizeChromeTabState(getCurrentStateForTab(tabId));
   return !!(
     existingState &&
     existingState.url === url &&
@@ -367,39 +337,6 @@ function shouldPreserveExistingHttpsState(tabId, url, securityInfo) {
     existingState.status.kind !== "loading" &&
     existingState.status.kind !== "unknown"
   );
-}
-
-async function buildStateFromNativeHelper(url) {
-  try {
-    const hostname = BigBrotherStatus.safeHostname(url);
-    const response = await sendNativeMessage({ type: "inspect_tls", hostname, url });
-    nativeHelperAvailable = true;
-    nativeHelperError = "";
-
-    if (!response || response.ok !== true) {
-      return createHttpsUnknownState(
-        url,
-        response && response.error
-          ? `Native helper could not inspect this host: ${response.error}`
-          : "Native helper did not return certificate data."
-      );
-    }
-
-    return BigBrotherStatus.buildTabState({
-      url,
-      securityInfo: {
-        protocol: "https:",
-        certificates: Array.isArray(response.certificates) ? response.certificates : [],
-      },
-    });
-  } catch (error) {
-    nativeHelperAvailable = false;
-    nativeHelperError = error && error.message ? error.message : "Native helper failed.";
-    return createHttpsUnknownState(
-      url,
-      `Native helper is not available. Install it with native-helper\\install-helper.ps1 and register it for this extension ID. ${nativeHelperError}`
-    );
-  }
 }
 
 async function updateTabStateForUrl(tabId, url, securityInfo) {
@@ -410,20 +347,13 @@ async function updateTabStateForUrl(tabId, url, securityInfo) {
     return;
   }
 
-  if (currentMode === "native_helper") {
-    setTabState(tabId, BigBrotherStatus.createLoadingState(url, "Checking certificate details with the native helper..."));
-    const nextState = await buildStateFromNativeHelper(url);
-    if (canApplyTabRequestResult(tabId, requestVersion, url)) {
-      setTabState(tabId, nextState);
-    }
-    return;
-  }
-
   if (!securityInfo) {
     if (shouldPreserveExistingHttpsState(tabId, url, securityInfo)) {
       return;
     }
-    setTabState(tabId, BigBrotherStatus.createLoadingState(url, getFlagModeReason()));
+
+    const nextState = await buildStateFromChromeSecurityInfo(url, null);
+    setTabState(tabId, nextState);
     return;
   }
 
@@ -439,37 +369,46 @@ function unregisterHeaderListener() {
   }
 }
 
-function registerHeaderListener() {
+function registerHeaderListener(useSecurityInfo) {
   unregisterHeaderListener();
 
   const filter = { urls: ["<all_urls>"], types: ["main_frame"] };
-  const baseOptions = ["responseHeaders", "extraHeaders"];
+  const extraInfoSpec = ["responseHeaders", "extraHeaders"];
 
-  if (currentMode === "chrome_flag") {
-    try {
-      chrome.webRequest.onHeadersReceived.addListener(handleHeadersReceived, filter, [
-        "responseHeaders",
-        "extraHeaders",
-        "securityInfoRawDer",
-      ]);
-      flagModeAvailable = true;
-      flagModeError = "";
-      return;
-    } catch (error) {
-      flagModeAvailable = false;
-      flagModeError = error && error.message ? error.message : "securityInfo registration failed.";
-    }
-  } else {
-    flagModeAvailable = false;
-    flagModeError = "";
+  if (useSecurityInfo) {
+    extraInfoSpec.push("securityInfoRawDer");
   }
 
-  chrome.webRequest.onHeadersReceived.addListener(handleHeadersReceived, filter, baseOptions);
+  chrome.webRequest.onHeadersReceived.addListener(handleHeadersReceived, filter, extraInfoSpec);
+  headerListenerUsesSecurityInfo = useSecurityInfo;
+}
+
+function registerPreferredHeaderListener() {
+  try {
+    registerHeaderListener(true);
+    flagModeAvailable = false;
+    flagModeKnown = false;
+    flagModeError = "";
+  } catch (error) {
+    setFlagModeAvailability(false, error && error.message ? error.message : "securityInfo registration failed.");
+    registerHeaderListener(false);
+  }
 }
 
 async function handleHeadersReceived(details) {
   if (details.type !== "main_frame" || typeof details.tabId !== "number" || details.tabId < 0) {
     return;
+  }
+
+  if (details.url && details.url.startsWith("https://")) {
+    if (details.securityInfo) {
+      setFlagModeAvailability(true, "");
+    } else {
+      setFlagModeAvailability(false, "Chrome did not expose TLS certificate metadata for this request.");
+      if (headerListenerUsesSecurityInfo) {
+        registerHeaderListener(false);
+      }
+    }
   }
 
   await updateTabStateForUrl(details.tabId, details.url, details.securityInfo || null);
@@ -487,28 +426,15 @@ async function refreshActiveTab() {
   await updateTabStateForUrl(tab.id, tab.url || "", null);
 }
 
-async function loadSettings() {
-  const stored = await storageGet(["mode"]);
-  const mode = MODE_OPTIONS.includes(stored.mode) ? stored.mode : DEFAULT_SETTINGS.mode;
-  currentMode = mode;
-  return { mode };
-}
-
 function buildSettingsPayload() {
   return {
     browserFamily: "chrome",
-    mode: currentMode,
-    modeOptions: MODE_OPTIONS,
-    setupText: getSetupText(currentMode),
+    setupText: "Start Chrome or another Chromium browser with --enable-features=WebRequestSecurityInfo. Example: chrome.exe --enable-features=WebRequestSecurityInfo",
     diagnostics: buildDiagnostics(),
   };
 }
 
-async function saveMode(mode) {
-  currentMode = MODE_OPTIONS.includes(mode) ? mode : DEFAULT_SETTINGS.mode;
-  await storageSet({ mode: currentMode });
-  registerHeaderListener();
-  await probeNativeHelper();
+async function saveMode() {
   await refreshActiveTab();
   return {
     settings: buildSettingsPayload(),
@@ -527,6 +453,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   if (changeInfo.status === "complete") {
+    const state = tabStates.get(tabId);
+    if (state && state.status && state.status.kind === "loading" && flagModeKnown && !flagModeAvailable) {
+      setTabState(tabId, BigBrotherStatus.createUnknownState(state.url || (tab && tab.url) || "", getFlagModeReason()));
+      return;
+    }
+
     refreshTabVisualState(tabId);
   }
 });
@@ -550,14 +482,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "GET_SETTINGS") {
-    probeNativeHelper()
-      .then(() => sendResponse(buildSettingsPayload()))
-      .catch(() => sendResponse(buildSettingsPayload()));
+    sendResponse(buildSettingsPayload());
     return true;
   }
 
   if (message.type === "SAVE_SETTINGS") {
-    saveMode(message.mode)
+    saveMode()
       .then((result) => sendResponse(result))
       .catch((error) => sendResponse({ error: error.message }));
     return true;
@@ -567,10 +497,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function bootstrap() {
-  await loadSettings();
   await restorePersistedTabStates();
-  registerHeaderListener();
-  await probeNativeHelper();
+  registerPreferredHeaderListener();
   await refreshActiveTab();
 }
 
@@ -579,13 +507,5 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 bootstrap().catch(() => {
-  registerHeaderListener();
+  registerPreferredHeaderListener();
 });
-
-
-
-
-
-
-
-
