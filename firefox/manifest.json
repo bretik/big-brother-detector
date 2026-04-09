@@ -22,7 +22,8 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "big-brother-detector@bretik.dev"
+      "id": "big-brother-detector-firefox@bretik.dev"
     }
   }
 }
+

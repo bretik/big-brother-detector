@@ -2,7 +2,8 @@ param(
   [string]$OutputRoot,
   [string]$ReleaseLabel,
   [string]$AmoJwtIssuer,
-  [string]$AmoJwtSecret
+  [string]$AmoJwtSecret,
+  [switch]$SkipAmoConnectivityCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,14 +43,13 @@ if (-not $webExt) {
   throw "web-ext was not found on PATH. Install it with 'npm install --global web-ext' before building signed release artifacts."
 }
 
-$amoConnectivityDiagnostic = & node -e "fetch('https://addons.mozilla.org/api/v5/').then(() => process.exit(0)).catch(err => { console.log('CAUSE_CODE=' + (err?.cause?.code || '')); console.log('CAUSE_MESSAGE=' + (err?.cause?.message || err?.message || '')); process.exit(1); })"
-if ($LASTEXITCODE -ne 0) {
-  $diagnosticText = ($amoConnectivityDiagnostic -join [Environment]::NewLine)
-  if ($diagnosticText -match 'CAUSE_CODE=UNABLE_TO_GET_ISSUER_CERT_LOCALLY') {
-    throw "Node.js cannot validate addons.mozilla.org TLS on this machine (UNABLE_TO_GET_ISSUER_CERT_LOCALLY). Set NODE_EXTRA_CA_CERTS to your corporate/root CA PEM file, and set HTTPS_PROXY/HTTP_PROXY as needed, then rerun package.ps1."
+if (-not $SkipAmoConnectivityCheck) {
+  try {
+    Invoke-WebRequest -Uri "https://addons.mozilla.org/" -Method Get -UseBasicParsing -TimeoutSec 20 | Out-Null
+  } catch {
+    Write-Warning "PowerShell could not reach addons.mozilla.org before signing. web-ext sign will still be attempted so you can see the real AMO/network/authentication error."
+    Write-Warning $_.Exception.Message
   }
-
-  throw "Node.js could not reach addons.mozilla.org before signing. Check proxy, firewall, and TLS trust settings, then rerun package.ps1."
 }
 
 New-Item -ItemType Directory -Path $signedFirefoxArtifactsRoot | Out-Null
@@ -70,7 +70,7 @@ try {
 }
 
 if ($LASTEXITCODE -ne 0) {
-  throw "web-ext sign failed. See the error above for the AMO/network/authentication details."
+  throw "web-ext sign failed. See the error above for the AMO, proxy, TLS trust, or authentication details."
 }
 
 $signedXpi = Get-ChildItem -LiteralPath $signedFirefoxArtifactsRoot -Filter *.xpi | Select-Object -First 1

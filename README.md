@@ -41,6 +41,26 @@ This creates:
 - `dist\chrome`
 - `dist\firefox`
 
+## Create release artifacts
+
+Run this from the project root:
+
+```powershell
+.\package.ps1
+```
+
+Required environment variables:
+
+- `AMO_JWT_ISSUER`
+- `AMO_JWT_SECRET`
+
+Optional:
+
+- `-SkipAmoConnectivityCheck`
+  Skips the PowerShell preflight request to addons.mozilla.org and goes straight
+  to `web-ext sign`. This is useful on locked-down corporate machines where the
+  preflight check is noisy or unreliable.
+
 ## Install in Firefox
 
 1. Open Firefox.
