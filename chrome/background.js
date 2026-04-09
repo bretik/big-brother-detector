@@ -442,6 +442,47 @@ async function saveMode() {
   };
 }
 
+function prewarmNavigation(tabId, url, shouldTrackActiveTab = false) {
+  if (typeof tabId !== "number" || tabId < 0 || !url) {
+    return;
+  }
+
+  if (shouldTrackActiveTab) {
+    activeTabId = tabId;
+  }
+
+  updateTabStateForUrl(tabId, url, null).catch(() => {});
+}
+
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId !== 0) {
+    return;
+  }
+
+  prewarmNavigation(details.tabId, details.url, details.tabId === activeTabId);
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) {
+    return;
+  }
+
+  prewarmNavigation(details.tabId, details.url, details.tabId === activeTabId);
+});
+
+chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+  prewarmNavigation(details.tabId, details.url, false);
+});
+
+chrome.tabs.onCreated.addListener((tab) => {
+  if (!tab || typeof tab.id !== "number") {
+    return;
+  }
+
+  const url = tab.pendingUrl || tab.url || "";
+  prewarmNavigation(tab.id, url, false);
+});
+
 chrome.tabs.onActivated.addListener(() => {
   refreshActiveTab().catch(() => {});
 });
@@ -454,8 +495,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
   if (changeInfo.status === "complete") {
     const state = tabStates.get(tabId);
-    if (state && state.status && state.status.kind === "loading" && flagModeKnown && !flagModeAvailable) {
-      setTabState(tabId, BigBrotherStatus.createUnknownState(state.url || (tab && tab.url) || "", getFlagModeReason()));
+    if (state && state.status && state.status.kind === "loading") {
+      const url = state.url || (tab && tab.url) || "";
+      const reason = flagModeKnown && !flagModeAvailable
+        ? getFlagModeReason()
+        : "Certificate details were not captured for this navigation. Reload the page to inspect this connection.";
+      setTabState(tabId, BigBrotherStatus.createUnknownState(url, reason));
       return;
     }
 
@@ -498,14 +543,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function bootstrap() {
   await restorePersistedTabStates();
-  registerPreferredHeaderListener();
   await refreshActiveTab();
 }
+
+registerPreferredHeaderListener();
 
 chrome.runtime.onInstalled.addListener(() => {
   bootstrap().catch(() => {});
 });
 
-bootstrap().catch(() => {
-  registerPreferredHeaderListener();
-});
+bootstrap().catch(() => {});
+
+
+
+
+
